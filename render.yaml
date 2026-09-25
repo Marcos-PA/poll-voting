@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: api
+    name: poll-voting-api
     runtime: python
     plan: free
     rootDir: back

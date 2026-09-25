@@ -1,4 +1,6 @@
-# fullstack-template
+# Poll Voting
+
+Built from [fullstack-template](https://github.com/Marcos-PA/fullstack-template).
 
 React + Vite + TS + Tailwind + shadcn/ui · FastAPI + SQLAlchemy · Postgres (Supabase) · Playwright.
 Deploy grátis: Vercel (front) + Render (back) + Supabase (banco).
