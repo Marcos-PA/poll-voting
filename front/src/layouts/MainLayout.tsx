@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 const links = [
   { to: "/", label: "Início" },
+  { to: "/polls", label: "Polls" },
   { to: "/tasks", label: "Tasks" },
 ];
 
