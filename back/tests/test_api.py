@@ -115,3 +115,31 @@ def test_vote_errors():
         assert client.post("/api/polls/999999/votes", json=body).status_code == 404
         assert client.post(url, json={"option_id": option_id, "voter_id": " "}).status_code == 422
         assert _vote_count(poll["id"]) == 0
+
+
+def test_results():
+    with TestClient(app) as client:
+        poll = client.post("/api/polls", json={"question": "Q", "options": ["a", "b", "c"]}).json()
+        a, b, c = (o["id"] for o in poll["options"])
+        url = f"/api/polls/{poll['id']}"
+
+        empty = client.get(f"{url}/results").json()
+        assert empty["total_votes"] == 0 and empty["voted_option_id"] is None
+        assert [o["percentage"] for o in empty["options"]] == [0, 0, 0]
+
+        for voter, option in [("v1", a), ("v2", a), ("v3", b)]:
+            client.post(f"{url}/votes", json={"option_id": option, "voter_id": voter})
+
+        results = client.get(f"{url}/results", params={"voter_id": "v3"}).json()
+        assert results["question"] == "Q"
+        assert results["total_votes"] == 3
+        assert results["voted_option_id"] == b
+        assert [(o["id"], o["text"], o["votes"], o["percentage"]) for o in results["options"]] == [
+            (a, "a", 2, 66.7),
+            (b, "b", 1, 33.3),
+            (c, "c", 0, 0),
+        ]
+
+        other = client.get(f"{url}/results", params={"voter_id": "nobody"}).json()
+        assert other["voted_option_id"] is None
+        assert client.get("/api/polls/999999/results").status_code == 404

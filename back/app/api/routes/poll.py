@@ -2,8 +2,10 @@ from fastapi import APIRouter
 
 from app.db.session import DbSession
 from app.schemas.poll import PollCreate, PollResponse
+from app.schemas.result import PollResults
 from app.schemas.vote import VoteCreate, VoteResponse
 from app.services import polls as polls_service
+from app.services import results as results_service
 from app.services import votes as votes_service
 
 router = APIRouter(prefix="/polls", tags=["polls"])
@@ -27,3 +29,8 @@ def get_poll(db: DbSession, poll_id: int):
 @router.post("/{poll_id}/votes", response_model=VoteResponse, status_code=201)
 def create_vote(db: DbSession, poll_id: int, vote: VoteCreate):
     return votes_service.create_vote(db, poll_id, vote)
+
+
+@router.get("/{poll_id}/results", response_model=PollResults)
+def get_results(db: DbSession, poll_id: int, voter_id: str | None = None):
+    return results_service.get_results(db, poll_id, voter_id)
