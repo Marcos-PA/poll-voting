@@ -38,3 +38,30 @@ def test_update_and_delete_task():
         assert client.delete(f"/api/tasks/{task_id}").status_code == 204
         assert client.delete(f"/api/tasks/{task_id}").status_code == 404
         assert client.patch(f"/api/tasks/{task_id}", json={"done": True}).status_code == 404
+
+
+def test_poll_create_list_get():
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/polls", json={"question": " Best color? ", "options": ["Red", " Blue "]}
+        )
+        assert created.status_code == 201
+        poll = created.json()
+        assert poll["question"] == "Best color?"
+        assert [o["text"] for o in poll["options"]] == ["Red", "Blue"]
+        assert poll["created_at"]
+
+        assert any(p["id"] == poll["id"] for p in client.get("/api/polls").json())
+        assert client.get(f"/api/polls/{poll['id']}").json() == poll
+        assert client.get("/api/polls/999999").status_code == 404
+
+
+def test_poll_validation():
+    with TestClient(app) as client:
+        for body in [
+            {"question": "", "options": ["a", "b"]},
+            {"question": "Q", "options": ["only one"]},
+            {"question": "Q", "options": ["a", "  "]},
+            {"question": "Q", "options": ["Same", "same"]},
+        ]:
+            assert client.post("/api/polls", json=body).status_code == 422, body
