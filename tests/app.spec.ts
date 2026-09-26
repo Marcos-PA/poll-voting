@@ -103,7 +103,7 @@ test("erro da API mostra a mensagem do back no toast", async ({ page, request })
 
 test("mobile 390px sem scroll horizontal", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
-  for (const path of ["/", "/tasks"]) {
+  for (const path of ["/", "/polls", "/tasks"]) {
     await page.goto(path);
     await expect(page.getByRole("main")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
@@ -134,4 +134,15 @@ test("sem erros no console no fluxo normal", async ({ page }) => {
   await page.getByRole("navigation").getByRole("link", { name: "Tasks" }).click();
   await expect(page.getByText(/de \d+ concluídas/)).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("creates a poll with one option per line", async ({ page }) => {
+  const question = `${TAG} Favorite fruit?`;
+  await page.goto("/polls");
+  await page.getByRole("button", { name: "New" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Question").fill(question);
+  await dialog.getByLabel("Options").fill("Apple\n\n  Banana  ");
+  await dialog.getByRole("button", { name: "Create" }).click();
+  await expect(page.getByRole("row").filter({ hasText: question })).toContainText("2");
 });
