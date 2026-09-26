@@ -6,9 +6,12 @@ Path("test.db").unlink(missing_ok=True)
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app.core.config import Settings
+from app.db.session import SessionLocal
 from app.main import app
+from app.models.vote import Vote
 
 
 def test_health_and_tasks():
@@ -65,3 +68,50 @@ def test_poll_validation():
             {"question": "Q", "options": ["Same", "same"]},
         ]:
             assert client.post("/api/polls", json=body).status_code == 422, body
+
+
+def _vote_count(poll_id: int) -> int:
+    with SessionLocal() as db:
+        return db.scalar(select(func.count()).where(Vote.poll_id == poll_id))
+
+
+def test_vote_once_per_poll():
+    with TestClient(app) as client:
+        poll = client.post("/api/polls", json={"question": "Q", "options": ["a", "b"]}).json()
+        a, b = (o["id"] for o in poll["options"])
+        url = f"/api/polls/{poll['id']}/votes"
+
+        created = client.post(url, json={"option_id": a, "voter_id": "v1"})
+        assert created.status_code == 201
+        assert created.json()["option_id"] == a
+
+        # Same voter again, even for another option: rejected by the unique constraint.
+        again = client.post(url, json={"option_id": b, "voter_id": "v1"})
+        assert again.status_code == 409
+        assert again.json()["detail"] == "You have already voted on this poll"
+        assert _vote_count(poll["id"]) == 1
+
+        # Another voter on this poll, and the same voter on another poll, are fine.
+        assert client.post(url, json={"option_id": b, "voter_id": "v2"}).status_code == 201
+        other = client.post("/api/polls", json={"question": "Q2", "options": ["x", "y"]}).json()
+        other_url = f"/api/polls/{other['id']}/votes"
+        body = {"option_id": other["options"][0]["id"], "voter_id": "v1"}
+        assert client.post(other_url, json=body).status_code == 201
+        assert _vote_count(poll["id"]) == 2
+
+
+def test_vote_errors():
+    with TestClient(app) as client:
+        poll = client.post("/api/polls", json={"question": "Q", "options": ["a", "b"]}).json()
+        other = client.post("/api/polls", json={"question": "Q2", "options": ["x", "y"]}).json()
+        option_id = poll["options"][0]["id"]
+        url = f"/api/polls/{poll['id']}/votes"
+
+        wrong = client.post(url, json={"option_id": other["options"][0]["id"], "voter_id": "v"})
+        assert wrong.status_code == 422
+        assert wrong.json()["detail"] == "Option does not belong to this poll"
+        assert client.post(url, json={"option_id": 999999, "voter_id": "v"}).status_code == 404
+        body = {"option_id": option_id, "voter_id": "v"}
+        assert client.post("/api/polls/999999/votes", json=body).status_code == 404
+        assert client.post(url, json={"option_id": option_id, "voter_id": " "}).status_code == 422
+        assert _vote_count(poll["id"]) == 0
