@@ -1,18 +1,19 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.db.session import engine
-from app.models import Base
 
 
-# ponytail: create_all só cria tabelas novas, não altera existentes. Adicione Alembic se o projeto continuar.
+# Applies pending Alembic migrations (back/migrations/versions) on every startup.
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(engine)
+    command.upgrade(Config(Path(__file__).parents[1] / "alembic.ini"), "head")
     yield
 
 
